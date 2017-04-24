@@ -24,6 +24,13 @@ module.exports = class Connection
           'x-delayed-type': 'direct'
         }
       }
+      responseQueue: {
+        name: [os.hostname(), process.title, process.pid, 'response', 'queue'].join('.')
+        type: [os.hostname(), process.title, process.pid, 'response', 'queue'].join('.')
+        autoDelete: true,
+        exclusive: true,
+        messageTtl: 600 * 1000, # clear messages out after 10 minutes
+      },
       onUnhandled: (message) ->
         @log.error 'Unhandled message', message
         message.nack()
@@ -97,16 +104,11 @@ module.exports = class Connection
     @options.fullFailure? message
 
   createResponseQueue: ->
-    @responseQueue = [os.hostname(), process.title, process.pid, 'response', 'queue'].join('.')
-    
-    queue = new Queue @responseQueue, {
-      name: @responseQueue,
-      type: @responseQueue,
-      autoDelete: true,
-      exclusive: true,
-      messageTtl: 600 * 1000, # clear messages out after 10 minutes
-    }, @
-    
+    if @options.responseQueue is false
+      return null
+
+    @responseQueue = @options.responseQueue.name
+    queue = new Queue @responseQueue, @options.responseQueue, @
     queue.processJob = (message) =>
       queue.channel.ack message
       
