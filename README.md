@@ -63,3 +63,10 @@ Beatrix(initOptions, function (err, connection) {
 * `lastComplete`: holds the timestamp of when the last message was processed in this queue
 * `partFailure(message)`: a method that recieves any messages which failed but are due to be retried
 * `fullFailure(message)`: a method that recieves any messages which have failed for the last time
+
+## Job options
+* `maxAttempts`: maximum number of retries before full-failing the job
+* `delayStrategy`: a strategy from [richthegeek/node-backoff-strategies](https://github.com/richthegeek/node-backoff-strategies) such as Exponential (default), Linear, Polynomial.
+* `delay`: primary input (multiplier, or values) for the chosen delayStrategy
+* `initialDelay`: initial delay before starting the first attempt of the job
+* `maxDelay`: input to the delay strategy to limit the maximum delay

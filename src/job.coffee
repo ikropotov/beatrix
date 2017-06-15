@@ -2,7 +2,7 @@ _ = require 'lodash'
 uuid = require('uuid')
 Rabbit = require('amqplib')
 Timeout = require('./callbackTimeout')
-ExponentialBackoff = require('backoff-strategies').Exponential
+Backoff = require('backoff-strategies')
 
 module.exports = class Job
 
@@ -25,6 +25,7 @@ module.exports = class Job
       initialDelay: 0,
       delay: 1000,
       maxDelay: 86400 * 1000
+      delayStrategy: 'Exponential'
     }
 
     unless options.messageId?
@@ -39,13 +40,26 @@ module.exports = class Job
     _.defaults options.headers, _.pick options, ['attempts', 'maxAttempts', 'delay']
 
     # set the delay
-    backoff = new ExponentialBackoff {
-      minValue: options.initialDelay,
-      maxValue: options.maxDelay,
-      multiplier: options.delay,
-      zeroMeansZero: true
-    }
+    options.delayStrategy = _.upperFirst options.delayStrategy
+    delayProps = {minValue: options.initialDelay, maxValue: options.maxDelay}
 
+    if options.delayStrategy is 'Defined'
+      strategy = Backoff.Defined
+      delayProps.values = _.castArray options.delay
+    else if options.delayStrategy is 'Linear'
+      strategy = Backoff.Linear
+      delayProps.multiplier = options.delay
+    else if options.delayStrategy is 'Polynomial'
+      strategy = Backoff.Polynomial
+      delayProps.multiplier = options.delay
+      delayProps.factor = options.delayFactor ? 2
+      delayProps.zeroMeansZero = true      
+    else
+      strategy = Backoff.Exponential
+      delayProps.multiplier = options.delay
+      delayProps.zeroMeansZero = true
+
+    backoff = new strategy delayProps
     options.headers['x-delay'] = backoff.get(options.headers.attempts)
 
     return options
@@ -56,14 +70,14 @@ module.exports = class Job
     unless options.headers.attempts <= options.headers.maxAttempts
       return cb? "Rejecting publish due to too many attempts: #{options.headers.attempts} >= #{options.headers.maxAttempts}"
 
-    @log.info {type: @type, id: options.messageId, request: options.replyTo?}, 'Publishing job to queue', body
-
-    body = new Buffer JSON.stringify body
-    result = @channel.publish(@connection.exchange.name, options.routingKey, body, options)
+    bodyBuffer = new Buffer JSON.stringify body
+    result = @channel.publish(@connection.exchange.name, options.routingKey, bodyBuffer, options)
 
     if result
+      @log.info {type: @type, id: options.messageId, request: options.replyTo?}, 'Published job to queue', body
       return cb? null, 'OK'
     else
+      @log.error {type: @type, id: options.messageId, request: options.replyTo?}, 'Could not publish job!', body
       return cb? 'Queue full.'
 
   request: (body, options, cb) ->

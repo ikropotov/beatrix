@@ -1,6 +1,6 @@
 {
   "name": "beatrix",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "description": "Opinionated RabbitMQ implementation",
   "main": "index.js",
   "scripts": {
@@ -25,7 +25,7 @@
   "homepage": "https://github.com/veoo/beatrix#readme",
   "dependencies": {
     "amqplib": "^0.5.1",
-    "backoff-strategies": "^1.0.1",
+    "backoff-strategies": "^1.1.0",
     "lodash": "^4.17.4",
     "uuid": "^3.0.1"
   },
