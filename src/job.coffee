@@ -40,9 +40,6 @@ module.exports = class Job
     _.defaults options.headers, _.pick options, ['attempts', 'maxAttempts', 'delay']
 
     # set the delay
-    options.delayStrategy = _.upperFirst options.delayStrategy
-    delayProps = {minValue: 0, maxValue: options.maxDelay}
-
     options.headers['x-delay'] = @getDelay options.headers.attempts, options
 
     return options
@@ -51,22 +48,23 @@ module.exports = class Job
     if attempt is 0
       return options.initialDelay
 
-    switch options.delayStrategy
+    delayProps =
+      minValue: 0,
+      maxValue: options.maxDelay
+      multiplier: options.delay
+
+    switch _.upperFirst options.delayStrategy
       when 'Defined'
         strategy = Backoff.Defined
         delayProps.values = _.castArray options.delay
+        delayProps.multiplier = 1
       when 'Linear'
         strategy = Backoff.Linear
-        delayProps.multiplier = options.delay
       when 'Polynomial'
         strategy = Backoff.Polynomial
-        delayProps.multiplier = options.delay
         delayProps.factor = options.delayFactor ? 2
-        delayProps.zeroMeansZero = true      
       else
         strategy = Backoff.Exponential
-        delayProps.multiplier = options.delay
-        delayProps.zeroMeansZero = true
 
     backoff = new strategy delayProps
     return backoff.get attempt
