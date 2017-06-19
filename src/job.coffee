@@ -41,28 +41,35 @@ module.exports = class Job
 
     # set the delay
     options.delayStrategy = _.upperFirst options.delayStrategy
-    delayProps = {minValue: options.initialDelay, maxValue: options.maxDelay}
+    delayProps = {minValue: 0, maxValue: options.maxDelay}
 
-    if options.delayStrategy is 'Defined'
-      strategy = Backoff.Defined
-      delayProps.values = _.castArray options.delay
-    else if options.delayStrategy is 'Linear'
-      strategy = Backoff.Linear
-      delayProps.multiplier = options.delay
-    else if options.delayStrategy is 'Polynomial'
-      strategy = Backoff.Polynomial
-      delayProps.multiplier = options.delay
-      delayProps.factor = options.delayFactor ? 2
-      delayProps.zeroMeansZero = true      
-    else
-      strategy = Backoff.Exponential
-      delayProps.multiplier = options.delay
-      delayProps.zeroMeansZero = true
-
-    backoff = new strategy delayProps
-    options.headers['x-delay'] = backoff.get(options.headers.attempts)
+    options.headers['x-delay'] = @getDelay options.headers.attempts, options
 
     return options
+
+  getDelay: (attempt, options) ->
+    if attempt is 0
+      return options.initialDelay
+
+    switch options.delayStrategy
+      when 'Defined'
+        strategy = Backoff.Defined
+        delayProps.values = _.castArray options.delay
+      when 'Linear'
+        strategy = Backoff.Linear
+        delayProps.multiplier = options.delay
+      when 'Polynomial'
+        strategy = Backoff.Polynomial
+        delayProps.multiplier = options.delay
+        delayProps.factor = options.delayFactor ? 2
+        delayProps.zeroMeansZero = true      
+      else
+        strategy = Backoff.Exponential
+        delayProps.multiplier = options.delay
+        delayProps.zeroMeansZero = true
+
+    backoff = new strategy delayProps
+    return backoff.get attempt
 
   publish: (body, options, cb) ->
     options = @mergePublishOptions options
