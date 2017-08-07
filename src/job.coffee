@@ -32,8 +32,8 @@ module.exports = class Job
       options.messageId = @queue.options.name + '.' + (++@queue.options.id)
 
     options.timestamp = Date.now()
-  
-    options.routingKey ?= options.type 
+
+    options.routingKey ?= options.type
     delete options.timeout # this is an option for Rabbot, delete it to prevent issues
 
     # copy things over to the headers
@@ -115,15 +115,9 @@ module.exports = class Job
 
     message.ack = _.once => try @channel.ack message
     message.nack = _.once => try @channel.nack message
-    message.body = JSON.parse message.content
-
-    message.attempt = headers.attempts
-    message.firstAttempt = message.attempt is 1
-    message.lastAttempt = (headers.attempts >= headers.maxAttempts)
-
     message.finish = (err, result, final) =>
       message.ack()
-      
+
       body = {err, result, final}
       if props.correlationId and props.replyTo and (final or not err)
         @log.info @processLogMeta(message), 'Replying', body
@@ -131,6 +125,16 @@ module.exports = class Job
         @channel.sendToQueue props.replyTo, body, {correlationId: props.correlationId}
       else
         @log.info @processLogMeta(message), 'Acking', body
+
+    try
+      message.body = JSON.parse message.content
+    catch err
+      return message.finish err, err, true
+
+    message.attempt = headers.attempts
+    message.firstAttempt = message.attempt is 1
+    message.lastAttempt = (headers.attempts >= headers.maxAttempts)
+
 
     @log.info @processLogMeta(message, {timeout: @queue.options.timeout}), 'Starting'
     callback = Timeout @queue.options.timeout, @processCallback.bind(@, message)
@@ -160,11 +164,11 @@ module.exports = class Job
         @queue.publish message.body, message.properties
         @jobPartFailure? message, err, result
         return false
-      
+
       if err
         message.finish err, null, true
         @jobFullFailure? message, err, result
-        return false 
+        return false
 
       else
         message.finish null, result, true
